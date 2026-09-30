@@ -44,6 +44,7 @@ import { getSingerMidBySingerName } from '@/helpers/userApi/getMusicSource'
 import { likeNeteaseSong } from '@/helpers/userApi/netease-music-api'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ScrollToTopFAB, useScrollToTop } from '@/components/ScrollToTopFAB'
+import PlaylistView from '@/components/PlaylistView'
 
 
 // 带展开动画的歌曲行组件
@@ -171,7 +172,7 @@ const PlaylistScreen = () => {
 	const router = useRouter()
 	const navigation = useNavigation()
 	const scrollY = React.useRef(new Animated.Value(0)).current
-	const { bottom: safeBottom } = useSafeAreaInsets()
+	const insets = useSafeAreaInsets()
 	const playlistScrollRef = React.useRef<any>(null)
 	const { onScroll: onPlaylistFabScroll, scrollToTop: playlistScrollToTop, progress: playlistFabProgress, shown: playlistFabShown } = useScrollToTop(playlistScrollRef)
 
@@ -187,20 +188,10 @@ const PlaylistScreen = () => {
 		extrapolate: 'clamp',
 	})
 
-	// 设置导航栏右侧搜索按钮
+	// 设置导航栏：原生组件自带导航栏，隐藏RN导航栏
 	React.useLayoutEffect(() => {
 		navigation.setOptions({
-			headerTintColor: isDark ? '#fff' : '#000',
-			headerRight: null,
-		theaderTitle: '',
-		theaderShadowVisible: false,
-		ttheaderStyle: { borderBottomWidth: 0, elevation: 0, shadowOpacity: 0 },
-		})
-	}, [navigation, isDark])
-
-	// 搜索框聚焦时禁用页面返回手势，避免点击迷你播放器时误触返回退出歌单
-	useEffect(() => {
-		navigation.setOptions({
+			headerShown: false,
 			gestureEnabled: !isSearchFocused,
 		})
 	}, [navigation, isSearchFocused])
@@ -685,110 +676,67 @@ const PlaylistScreen = () => {
 		return <Redirect href={'/(tabs)/favorites'} />
 	}
 
+	// 转换歌曲格式给原生组件
+	const nativeSongs = sortedSongs.map((song: any, index: number) => {
+		const isActive = currentMusic && (
+			String(song.id || song.songmid || '') === String(currentMusic.id || '') ||
+			String(song.songmid || '') === String(currentMusic.songmid || '')
+		)
+		return {
+			title: song.title || song.name || '未知歌曲',
+			artist: song.artist || song.singer || '未知歌手',
+			album: song.album || '',
+			isPlaying: !!isActive,
+		}
+	})
+
+	const formattedPlayCount = (playlist as any)?.playCount > 0
+		? (playlist as any).playCount >= 100000000
+			? ((playlist as any).playCount / 100000000).toFixed(1) + '亿次播放'
+			: (playlist as any).playCount >= 10000
+				? Math.floor((playlist as any).playCount / 10000) + '万次播放'
+				: (playlist as any).playCount + '次播放'
+		: undefined
+
 	return (
 		<>
 		<View style={[styles.container, { backgroundColor: colors.background }]}>
-			<Animated.FlatList
-				ref={playlistScrollRef}
-				data={sortedSongs}
-				renderItem={renderSongItem}
-				extraData={currentMusic?.id}
-				keyExtractor={(item, index) => `${item.id || item.songmid || 'song'}_${index}`}
-				initialNumToRender={10}
-				maxToRenderPerBatch={10}
-				windowSize={5}
-				removeClippedSubviews={false}
-				updateCellsBatchingPeriod={50}
-				keyboardShouldPersistTaps="handled"
-				onScroll={Animated.event(
-					[{ nativeEvent: { contentOffset: { y: scrollY } } }],
-					{ useNativeDriver: true, listener: onPlaylistFabScroll },
-				)}
-				scrollEventThrottle={16}
-				ListHeaderComponent={
-					<View style={styles.playlistHeader}>
-						{/* 封面+信息行 */}
-						<View style={styles.infoRow}>
-							<FastImage
-								source={{ uri: firstSongCover, cache: shouldCacheImage() ? FastImage.cacheControl.immutable : FastImage.cacheControl.noCache }}
-								style={styles.coverImage}
-							/>
-							<View style={styles.infoText}>
-								<Text style={[styles.infoTitle, { color: colors.text }]} numberOfLines={2}>
-									{playlist.title || playlist.name || '歌单'}
-								</Text>
-								<Text style={[styles.infoSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
-									{isNeteasePlaylist ? '网易云音乐' : isQQPlaylist ? 'QQ音乐' : '自建歌单'}
-								</Text>
-								{isNeteasePlaylist && (playlist as any)?.playCount > 0 && (
-									<Text style={[styles.infoSubtitle, { color: colors.textMuted, marginTop: 2 }]} numberOfLines={1}>
-										{(playlist as any).playCount >= 100000000
-											? ((playlist as any).playCount / 100000000).toFixed(1) + '亿次播放'
-											: (playlist as any).playCount >= 10000
-												? Math.floor((playlist as any).playCount / 10000) + '万次播放'
-												: (playlist as any).playCount + '次播放'}
-									</Text>
-								)}
-							</View>
-						</View>
-
-						{/* 已收藏/刷新按钮行（推荐歌单隐藏） */}
-						{!(playlist as any)?.isRecommendPlaylist && !(playlist as any)?.isToplist && (
-						<View style={styles.pillRow}>
-							<TouchableOpacity
-								style={[styles.pillButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.07)' }]}
-								onPress={handleDeletePlaylist}
-							>
-								<SFSymbol systemName="trash" size={18} color={colors.text} />
-								<Text style={[styles.pillText, { color: colors.text }]}>删除</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={[styles.pillButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.07)' }]}
-								onPress={() => handleRefresh()}
-								disabled={isRefreshing}
-							>
-								{isRefreshing ? (
-									<ActivityIndicator size="small" color={colors.text} />
-								) : (
-									<SFSymbol systemName="arrow.clockwise" size={18} color={colors.text} />
-								)}
-								<Text style={[styles.pillText, { color: colors.text }]}>刷新</Text>
-							</TouchableOpacity>
-						</View>
-						)}
-
-						{/* 播放/随机播放按钮行 */}
-						<View style={styles.playRow}>
-							<TouchableOpacity
-								style={[styles.playAllButton, { backgroundColor: isDark ? '#fff' : '#1c1c1e' }]}
-								onPress={handlePlayAll}
-							>
-								<SFSymbol systemName="play.fill" size={20} color={isDark ? '#000' : '#fff'} />
-								<Text style={[styles.playAllText, { color: isDark ? '#000' : '#fff' }]}>播放</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={[styles.shuffleAllButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.07)' }]}
-								onPress={handleShufflePlay}
-							>
-								<MaterialCommunityIcons name="shuffle" size={20} color={colors.text} />
-								<Text style={[styles.shuffleAllText, { color: colors.text }]}>随机播放</Text>
-							</TouchableOpacity>
-						</View>
-
-						{/* 歌曲列表头 */}
-						<View style={styles.sectionHeader}>
-							<Text style={[styles.sectionTitle, { color: colors.text }]}>
-								歌曲 <Text style={{ fontWeight: '500' }}>{sortedSongs.length}</Text>
-							</Text>
-							<TouchableOpacity style={styles.sortButton} onPress={handleSort}>
-								<SFSymbol systemName="arrow.up.arrow.down" size={18} color={colors.textMuted} />
-								<Text style={[styles.sortText, { color: colors.textMuted }]}>排序</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
-				}
-				contentContainerStyle={styles.listContent}
+			{/* 原生网易云风格歌单详情页 */}
+			<PlaylistView
+				coverUrl={firstSongCover}
+				title={playlist.title || playlist.name || '歌单'}
+				creatorName={isNeteasePlaylist ? '网易云音乐' : isQQPlaylist ? 'QQ音乐' : '自建歌单'}
+				playCount={formattedPlayCount}
+				songs={nativeSongs}
+				onSongPress={(event) => {
+					const idx = event.nativeEvent.index
+					if (sortedSongs[idx]) handlePlaySong(sortedSongs[idx])
+				}}
+				onBack={() => router.back()}
+				style={{ flex: 1 }}
 			/>
+			{/* 右上角操作按钮：删除 + 刷新 */}
+			{!(playlist as any)?.isRecommendPlaylist && !(playlist as any)?.isToplist && (
+			<View style={{ position: 'absolute', top: insets.top + 8, right: 16, flexDirection: 'row', gap: 10, zIndex: 50 }}>
+				<TouchableOpacity
+					style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}
+					onPress={handleDeletePlaylist}
+				>
+					<SFSymbol systemName="trash" size={16} color="#fff" />
+				</TouchableOpacity>
+				<TouchableOpacity
+					style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}
+					onPress={() => handleRefresh()}
+					disabled={isRefreshing}
+				>
+					{isRefreshing ? (
+						<ActivityIndicator size="small" color="#fff" />
+					) : (
+						<SFSymbol systemName="arrow.clockwise" size={16} color="#fff" />
+					)}
+				</TouchableOpacity>
+			</View>
+			)}
 			{/* 上滑后吸顶显示的搜索框（首屏隐藏），推荐歌单/排行榜不显示 */}
 			{!(playlist as any)?.isRecommendPlaylist && !(playlist as any)?.isToplist && (
 			<Animated.View pointerEvents="box-none" style={{
@@ -828,7 +776,7 @@ const PlaylistScreen = () => {
 				</View>
 			</Animated.View>
 			)}
-			<ScrollToTopFAB progress={playlistFabProgress} shown={playlistFabShown} onPress={playlistScrollToTop} bottom={safeBottom + 128} />
+			<ScrollToTopFAB progress={playlistFabProgress} shown={playlistFabShown} onPress={playlistScrollToTop} bottom={insets.bottom + 128} />
 		</View>
 		<DownloadQualityModal
 			visible={showDownloadModal}
