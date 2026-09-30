@@ -36,15 +36,12 @@ module.exports = function withNativeIOS(config) {
       'LyricsView.swift',
       'LyricsViewManager.m',
       'BlurTextUIView.swift',
-      'NetEasePlaylistView.swift',
-      'PlaylistViewManager.m',
     ].filter(f => fs.existsSync(path.join(nativeDir, f)))
 
     // 头文件（只加入工程，不编译）
     const headerFiles = [
       'userapi/WellMusicUserApiRuntime.h',
       'LyricsViewManager.h',
-      'PlaylistViewManager.h',
     ].filter(f => fs.existsSync(path.join(nativeDir, f)))
 
     // 资源文件（加入 Copy Bundle Resources）
