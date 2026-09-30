@@ -71,7 +71,6 @@ const SettingsPage = () => {
 	const { backgroundMode, setBackgroundMode, lyricFont, setLyricFont, heitiFontWeight, setHeitiFontWeight } = useAMLLSettingsStore()
 	const [oldArtistPage, setOldArtistPage] = useState(PersistStatus.get('music.oldArtistPage' as any) === true)
 	const [songHighlightAnimation, setSongHighlightAnimation] = useState(PersistStatus.get('music.songHighlightAnimation' as any) === true)
-	const [showSearchHistory, setShowSearchHistory] = useState(PersistStatus.get('search.showHistory') !== false)
 
 	const [recentSyncNetease, setRecentSyncNetease] = useState(PersistStatus.get('music.recentSyncNetease' as any) !== false)
 	const [scrobbleToNetease, setScrobbleToNetease] = useState(PersistStatus.get('music.scrobbleToNetease' as any) !== false)
