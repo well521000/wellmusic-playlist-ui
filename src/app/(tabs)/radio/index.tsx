@@ -410,8 +410,7 @@ const HomeScreen = () => {
 		fetchToplists()
 		// 非关键数据延迟500ms加载，不阻塞首屏
 		setTimeout(() => {
-				refreshFollowedArtists()
-			}
+			refreshFollowedArtists()
 		}, 500)
 
 	}, [])
