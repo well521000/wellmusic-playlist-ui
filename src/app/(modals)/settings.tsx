@@ -17,7 +17,6 @@ import { CacheManagerScreen } from '@/components/CacheManagerScreen'
 import { BackupManagerScreen } from '@/components/BackupManagerScreen'
 import LogScreen from '@/components/LogScreen'
 import SourceCenter from '@/app/(modals)/sourceCenter'
-import { CustomArtistsModal } from '@/components/CustomArtistsModal'
 import { PlayerLayoutScreen } from '@/components/PlayerLayoutScreen'
 import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
@@ -62,8 +61,7 @@ const SettingsPage = () => {
 	const [builtinSourceEnabled, setBuiltinSourceEnabled] = useState(PersistStatus.get('music.builtinSourceEnabled') === 'true')
 	const [builtinSourceToastEnabled, setBuiltinSourceToastEnabled] = useState(PersistStatus.get('music.builtinSourceToastEnabled') !== 'false')
 
-	const [showRapRandom, setShowRapRandom] = useState(PersistStatus.get('music.showRapRandomSongs' as any) === true)
-	const [showFavRecommend, setShowFavRecommend] = useState(PersistStatus.get('music.showRecommendByFavorite' as any) === true)
+	const [showSearchHistory, setShowSearchHistory] = useState(PersistStatus.get('search.showHistory' as any) !== false)
 	const [stylizedRecommend, setStylizedRecommend] = useState(PersistStatus.get('music.showStylizedRecommend' as any) === true)
 	const [kbMiniOffset, setKbMiniOffset] = useState(parseInt(PersistStatus.get('app.keyboardMiniPlayerOffset' as any) || '0', 10))
 
@@ -86,7 +84,6 @@ const SettingsPage = () => {
 	const [showBackupManager, setShowBackupManager] = useState(false)
 	const [showLogScreen, setShowLogScreen] = useState(false)
 	const [showSourceCenter, setShowSourceCenter] = useState(false)
-	const [showCustomArtists, setShowCustomArtists] = useState(false)
 	const [showPlayerLayout, setShowPlayerLayout] = useState(false)
 
 	const themeLabel = themeMode === 'light' ? '浅色' : themeMode === 'dark' ? '深色' : '跟随系统'
@@ -369,25 +366,6 @@ const SettingsPage = () => {
 				{/* 推荐分组 */}
 				<Section title="推荐">
 					<SwitchRow
-						title="自定义歌手随机歌曲"
-						subtitle="关闭后发现页的自定义歌手随机歌曲将不显示"
-						value={showRapRandom}
-						onSwitch={(v: boolean) => { setShowRapRandom(v); PersistStatus.set('music.showRapRandomSongs' as any, v) }}
-					/>
-					{showRapRandom && (
-						<>
-							{sep()}
-							<MenuRow title="管理自定义歌手" onPress={() => setShowCustomArtists(true)} />
-						</>
-					)}
-					{sep()}
-					<SwitchRow
-						title="根据你喜爱的歌曲推荐"
-						value={showFavRecommend}
-						onSwitch={(v: boolean) => { setShowFavRecommend(v); PersistStatus.set('music.showRecommendByFavorite' as any, v) }}
-					/>
-					{sep()}
-					<SwitchRow
 						title="风格化推荐"
 						value={stylizedRecommend}
 						onSwitch={(v: boolean) => { setStylizedRecommend(v); PersistStatus.set('music.showStylizedRecommend' as any, v) }}
@@ -436,7 +414,6 @@ const SettingsPage = () => {
 			<Modal visible={showBackupManager} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowBackupManager(false)}><BackupManagerScreen onClose={() => setShowBackupManager(false)} /></Modal>
 			<Modal visible={showLogScreen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowLogScreen(false)}><LogScreen onClose={() => setShowLogScreen(false)} /></Modal>
 			<Modal visible={showSourceCenter} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowSourceCenter(false)}><SourceCenter onClose={() => setShowSourceCenter(false)} /></Modal>
-			<CustomArtistsModal visible={showCustomArtists} onClose={() => setShowCustomArtists(false)} />
 			<Modal visible={showPlayerLayout} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowPlayerLayout(false)}><PlayerLayoutScreen onClose={() => setShowPlayerLayout(false)} /></Modal>
 		</View>
 	)

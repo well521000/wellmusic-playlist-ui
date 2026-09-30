@@ -207,7 +207,7 @@ const PlaylistScreen = () => {
 	const playlists = playListsStore.useValue() as Playlist[] | null
 	const currentMusic = myTrackPlayer.useCurrentMusic()
 	const [isRefreshing, setIsRefreshing] = useState(false)
-	const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false)
+	const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
 	const [showDownloadModal, setShowDownloadModal] = useState(false)
 	const [showSimilarSongs, setShowSimilarSongs] = useState(false)
 	const [similarSong, setSimilarSong] = useState<any>(null)
@@ -472,25 +472,16 @@ const PlaylistScreen = () => {
 		return `${minutes}分钟`
 	}, [songs])
 
-	// 加载自动刷新设置
+	// 自动同步：每30分钟刷新一次（默认开启，不可关闭）
 	useEffect(() => {
-		const key = `autoRefresh_${playlistID}`
-		const saved = PersistStatus.get(key)
-		if (saved === true || saved === 'true') {
-			setAutoRefreshEnabled(true)
-		}
-	}, [playlistID])
-
-	// 自动同步：每1小时刷新一次
-	useEffect(() => {
-		if (!autoRefreshEnabled || !isNeteasePlaylist || !playlist?.neteasePlaylistId) return
+		if (!isNeteasePlaylist || !playlist?.neteasePlaylistId) return
 
 		const timer = setInterval(() => {
 			handleRefresh(true)
-		}, 60 * 60 * 1000)
+		}, 30 * 60 * 1000)
 
 		return () => clearInterval(timer)
-	}, [autoRefreshEnabled, isNeteasePlaylist, playlist?.neteasePlaylistId])
+	}, [isNeteasePlaylist, playlist?.neteasePlaylistId])
 
 	// 刷新歌单
 	const handleRefresh = useCallback(async (silent = false) => {
@@ -556,15 +547,6 @@ const PlaylistScreen = () => {
 			if (!silent) setIsRefreshing(false)
 		}
 	}, [playlist, isNeteasePlaylist, isQQPlaylist])
-
-	// 切换自动刷新
-	const toggleAutoRefresh = useCallback(() => {
-		const key = `autoRefresh_${playlistID}`
-		const newValue = !autoRefreshEnabled
-		setAutoRefreshEnabled(newValue)
-		PersistStatus.set(key, newValue)
-		showToast(newValue ? '已开启同步，每1小时自动更新' : '已关闭同步', '', 'success')
-	}, [autoRefreshEnabled, playlistID])
 
 	// 播放全部
 	const handlePlayAll = useCallback(() => {
@@ -772,16 +754,6 @@ const PlaylistScreen = () => {
 								)}
 								<Text style={[styles.pillText, { color: colors.text }]}>刷新</Text>
 							</TouchableOpacity>
-					{(isNeteasePlaylist || isQQPlaylist) && (
-							<TouchableOpacity
-								style={[styles.pillButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.07)' }]}
-								onPress={toggleAutoRefresh}
-								disabled={false}
-							>
-								<SFSymbol systemName={autoRefreshEnabled ? 'arrow.down.circle' : 'download-outline'} size={18} color={autoRefreshEnabled ? colors.text : colors.textMuted} />
-								<Text style={[styles.pillText, { color: autoRefreshEnabled ? colors.text : colors.textMuted }]}>同步</Text>
-							</TouchableOpacity>
-					)}
 						</View>
 						)}
 

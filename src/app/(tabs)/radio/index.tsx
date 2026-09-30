@@ -68,15 +68,13 @@ const HomeScreen = () => {
 	const colors = useThemeColors()
 	const { isDark } = useAppTheme()
 	const { top } = useSafeAreaInsets()
-	const { tracks, isLoggedIn, nickname, avatar, refreshDaily, setLoginInfo, logout, recommendByFavoriteTracks, recommendRapTracks, refreshRecommend, refreshByFavorite, refreshRap, personalizedPlaylists, refreshPersonalized, cookie, userPlaylists, importUserPlaylists, banners, refreshBanners, followedArtists, followedArtistsLoaded, refreshFollowedArtists, qqLoggedIn } = useDailyRecommendStore()
+	const { tracks, isLoggedIn, nickname, avatar, refreshDaily, setLoginInfo, logout, refreshRecommend, personalizedPlaylists, refreshPersonalized, cookie, userPlaylists, importUserPlaylists, banners, refreshBanners, followedArtists, followedArtistsLoaded, refreshFollowedArtists, qqLoggedIn } = useDailyRecommendStore()
 	const chineseTitleEnabled = useTitleLanguageStore((s) => s.chineseTitleEnabled)
 	const hideNeteaseBanner = useHideBannerStore((s) => s.hideNeteaseBanner)
 	const [refreshing, setRefreshing] = useState(false)
 	const [showLoginModal, setShowLoginModal] = useState(false)
 	const [loginStatus, setLoginStatus] = useState('')
 	const [cookieInput, setCookieInput] = useState('')
-	const [refreshingFavorite, setRefreshingFavorite] = useState(false)
-	const [refreshingRap, setRefreshingRap] = useState(false)
 
 	const [bannerLoading, setBannerLoading] = useState(false)
 	const [currentBannerIndex, setCurrentBannerIndex] = useState(0)
@@ -95,15 +93,11 @@ const HomeScreen = () => {
 	const [showStylizedModal, setShowStylizedModal] = useState(false)
 	const [stylizedSelection, setStylizedSelection] = useState<{categoryId: number, tagIds: number[]} | null>(null)
 	// 懒加载状态
-	const [rapVisiblePages, setRapVisiblePages] = useState(1)
-	const [favoriteVisiblePages, setFavoriteVisiblePages] = useState(1)
 	const [stylizedVisibleCount, setStylizedVisibleCount] = useState(7)
 	const [followedVisibleCount, setFollowedVisibleCount] = useState(6)
 	// 风格化推荐开关状态，用useValue实时监听变化
 	const showStylizedRecommendRaw = PersistStatus.useValue('music.showStylizedRecommend' as any, false)
 	const showStylizedRecommend = showStylizedRecommendRaw === true || showStylizedRecommendRaw === 'true' ? true : false
-const showRapRandom = PersistStatus.useValue('music.showRapRandomSongs' as any, true) !== false
-const showFavRecommend = PersistStatus.useValue('music.showRecommendByFavorite' as any, true) !== false
 
 	// 网易云封面按尺寸压缩（对齐 kumone resizedImageURL）
 	const resizeNeteaseCover = (url: string, size: number) => {
@@ -406,45 +400,6 @@ const showFavRecommend = PersistStatus.useValue('music.showRecommendByFavorite' 
 	}, [])
 
 	// 页面加载时刷新日推和推荐
-	// 检查并刷新说唱（当日首次打开才刷新）
-	const checkAndRefreshRap = useCallback(async () => {
-		try {
-			const today = new Date().toDateString()
-			const lastRapRefresh = await AsyncStorage.getItem('lastRapRefreshDate')
-			if (lastRapRefresh !== today) {
-				setRefreshingRap(true)
-				await refreshRap()
-				setRefreshingRap(false)
-				await AsyncStorage.setItem('lastRapRefreshDate', today)
-				console.log('当日首次打开，刷新说唱推荐')
-			} else {
-				console.log('今日已刷新说唱，保留上次数据')
-			}
-		} catch (e) {
-			console.error('检查说唱刷新失败:', e)
-			setRefreshingRap(false)
-		}
-	}, [refreshRap])
-
-	// 检查并刷新喜爱推荐（当日首次打开才刷新）
-	const checkAndRefreshFavorite = useCallback(async () => {
-		try {
-			const today = new Date().toDateString()
-			const lastFavoriteRefresh = await AsyncStorage.getItem('lastFavoriteRefreshDate')
-			if (lastFavoriteRefresh !== today) {
-				setRefreshingFavorite(true)
-				await refreshByFavorite()
-				setRefreshingFavorite(false)
-				await AsyncStorage.setItem('lastFavoriteRefreshDate', today)
-				console.log('当日首次打开，刷新喜爱推荐')
-			} else {
-				console.log('今日已刷新喜爱推荐，保留上次数据')
-			}
-		} catch (e) {
-			console.error('检查喜爱推荐刷新失败:', e)
-			setRefreshingFavorite(false)
-		}
-	}, [refreshByFavorite])
 
 	useEffect(() => {
 		// 首屏关键数据立即加载
@@ -455,9 +410,6 @@ const showFavRecommend = PersistStatus.useValue('music.showRecommendByFavorite' 
 		fetchToplists()
 		// 非关键数据延迟500ms加载，不阻塞首屏
 		setTimeout(() => {
-			checkAndRefreshRap()
-			if (isLoggedIn || qqLoggedIn) {
-				checkAndRefreshFavorite()
 				refreshFollowedArtists()
 			}
 		}, 500)
@@ -467,7 +419,6 @@ const showFavRecommend = PersistStatus.useValue('music.showRecommendByFavorite' 
 	// 登录状态变化时刷新推荐
 	useEffect(() => {
 		if (isLoggedIn) {
-			checkAndRefreshFavorite()
 			// 如果没有设置过风格化推荐，默认设置为hiphop说唱
 			loadStylizedSelection().then((data) => {
 				if (!data || !data.categoryId || !data.tagIds) {
@@ -586,28 +537,6 @@ const showFavRecommend = PersistStatus.useValue('music.showRecommendByFavorite' 
 	}, [])
 
 	// 刷新喜爱推荐
-	const handleRefreshFavorite = useCallback(async () => {
-		if (refreshingFavorite) return
-		setRefreshingFavorite(true)
-		try {
-			useDailyRecommendStore.setState({ recommendByFavoriteTracks: [] })
-			await refreshByFavorite()
-		} finally {
-			setRefreshingFavorite(false)
-		}
-	}, [refreshByFavorite, refreshingFavorite])
-
-	// 刷新说唱推荐
-	const handleRefreshRap = useCallback(async () => {
-		if (refreshingRap) return
-		setRefreshingRap(true)
-		try {
-			useDailyRecommendStore.setState({ recommendRapTracks: [] })
-			await refreshRap()
-		} finally {
-			setRefreshingRap(false)
-		}
-	}, [refreshRap, refreshingRap])
 
 	// 打开登录弹窗
 	const startQRLogin = useCallback(() => {
@@ -1110,205 +1039,6 @@ const showFavRecommend = PersistStatus.useValue('music.showRecommendByFavorite' 
 			)}
 
 				{/* 底部留白 */}
-				{/* 根本停不下来的说唱 */}
-				{showRapRandom && (
-				<View style={styles.dailySection}>
-					<View style={styles.dailyHeader}>
-						<Text style={[styles.sectionTitle, { color: colors.text }]}>自定义歌手随机歌曲</Text>
-						<TouchableOpacity onPress={handleRefreshRap} disabled={refreshingRap} style={{ marginRight: 8 }}>
-							{refreshingRap ? (
-								<ActivityIndicator size="small" color={colors.primary} />
-							) : (
-								<SFSymbol systemName="arrow.clockwise" size={20} color={colors.textMuted} />
-							)}
-						</TouchableOpacity>
-					</View>
-					{recommendRapTracks.length > 0 ? (
-						<ScrollView
-							horizontal
-							showsHorizontalScrollIndicator={false}
-							snapToInterval={SCREEN_WIDTH}
-							snapToAlignment="start"
-							decelerationRate={0.99}
-							pagingEnabled={false}
-							scrollEventThrottle={100}
-							onScroll={(e) => {
-								const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent
-								if (contentSize.width > 0 && contentOffset.x + layoutMeasurement.width >= contentSize.width - 50) {
-									setRapVisiblePages((prev) => Math.min(prev + 1, Math.ceil(recommendRapTracks.length / 4)))
-								}
-							}}
-						>
-							{(() => {
-								// 分成多页，每页4首
-								const pages: any[][] = []
-								for (let i = 0; i < recommendRapTracks.length; i += 4) {
-									pages.push(recommendRapTracks.slice(i, i + 4))
-								}
-								return pages.slice(0, rapVisiblePages).map((page, pageIndex) => (
-									<View key={pageIndex} style={{ width: SCREEN_WIDTH, paddingHorizontal: 4, flexDirection: 'column' }}>
-										{page.map((item: any, index: number) => {
-											const globalIndex = pageIndex * 4 + index
-											return (
-												<TouchableOpacity key={item.id || globalIndex} onPress={() => handlePlayRecommendTrack(recommendRapTracks, globalIndex)} activeOpacity={0.6}
-													style={{
-														width: SCREEN_WIDTH - 8,
-														flexDirection: 'row',
-														justifyContent: 'flex-start',
-														alignItems: 'center',
-														paddingVertical: 10,
-														overflow: 'hidden',
-													}}
-												>
-													<FastImage
-														source={{ uri: item.artwork }}
-														style={{
-															width: 50,
-									height: 50,
-								borderRadius: 8,
-														}}
-													/>
-													<View style={{ flex: 1, marginLeft: 12, marginRight: 8 }}>
-														<Text
-															style={{
-																fontSize: 16,
-																fontWeight: '500',
-																color: colors.text,
-															}}
-															numberOfLines={1}
-														>
-															{item.title}
-														</Text>
-														<Text
-															style={{
-																fontSize: 13,
-																color: colors.textMuted,
-																marginTop: 2,
-															}}
-															numberOfLines={1}
-														>
-															{item.artist}
-														</Text>
-													</View>
-												</TouchableOpacity>
-											)
-										})}
-									</View>
-								))
-							})()}
-						</ScrollView>
-					) : (
-						<View style={styles.loadingContainer}>
-							<ActivityIndicator size="small" color={colors.primary} />
-							<Text style={[styles.loadingText, { color: colors.textMuted }]}>
-								{isLoggedIn ? '加载中...' : '登录网易云后查看推荐'}
-							</Text>
-						</View>
-					)}
-				</View>
-				)}
-
-				{/* 根据你喜爱的歌曲推荐 */}
-				{showFavRecommend && (
-				<View style={styles.dailySection}>
-					<View style={styles.dailyHeader}>
-						<Text style={[styles.sectionTitle, { color: colors.text }]}>根据你喜爱的歌曲推荐</Text>
-						<TouchableOpacity onPress={handleRefreshFavorite} disabled={refreshingFavorite} style={{ marginRight: 8 }}>
-							{refreshingFavorite ? (
-								<ActivityIndicator size="small" color={colors.primary} />
-							) : (
-								<SFSymbol systemName="arrow.clockwise" size={20} color={colors.textMuted} />
-							)}
-						</TouchableOpacity>
-					</View>
-					{recommendByFavoriteTracks.length > 0 ? (
-						<ScrollView
-							horizontal
-							showsHorizontalScrollIndicator={false}
-							snapToInterval={SCREEN_WIDTH}
-							snapToAlignment="start"
-							decelerationRate={0.99}
-							pagingEnabled={false}
-							scrollEventThrottle={100}
-							onScroll={(e) => {
-								const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent
-								if (contentSize.width > 0 && contentOffset.x + layoutMeasurement.width >= contentSize.width - 50) {
-									setFavoriteVisiblePages((prev) => Math.min(prev + 1, Math.ceil(recommendByFavoriteTracks.length / 2)))
-								}
-							}}
-						>
-							{(() => {
-								// 分成多页，每页2首
-								const pages: any[][] = []
-								for (let i = 0; i < recommendByFavoriteTracks.length; i += 2) {
-									pages.push(recommendByFavoriteTracks.slice(i, i + 2))
-								}
-								return pages.slice(0, favoriteVisiblePages).map((page, pageIndex) => (
-									<View key={pageIndex} style={{ width: SCREEN_WIDTH, paddingHorizontal: 4, flexDirection: 'column' }}>
-										{page.map((item: any, index: number) => {
-											const globalIndex = pageIndex * 2 + index
-											return (
-												<TouchableOpacity
-													key={item.id || globalIndex}
-													style={{
-														width: SCREEN_WIDTH - 8,
-														flexDirection: 'row',
-														justifyContent: 'flex-start',
-														alignItems: 'center',
-														paddingVertical: 12,
-														overflow: 'hidden',
-													}}
-													onPress={() => handlePlayRecommendTrack(recommendByFavoriteTracks, globalIndex)}
-													activeOpacity={0.6}
-												>
-													<FastImage
-														source={{ uri: item.artwork }}
-														style={{
-															width: 56,
-															height: 56,
-															borderRadius: 10,
-														}}
-													/>
-													<View style={{ flex: 1, marginLeft: 12, marginRight: 8 }}>
-														<Text
-															style={{
-																fontSize: 16,
-																fontWeight: '500',
-																color: colors.text,
-															}}
-															numberOfLines={1}
-														>
-															{item.title}
-														</Text>
-														<Text
-															style={{
-																fontSize: 13,
-																color: colors.textMuted,
-																marginTop: 2,
-															}}
-															numberOfLines={1}
-														>
-															{item.artist}
-														</Text>
-													</View>
-												</TouchableOpacity>
-											)
-										})}
-									</View>
-								))
-							})()}
-						</ScrollView>
-					) : (
-						<View style={styles.loadingContainer}>
-							<ActivityIndicator size="small" color={colors.primary} />
-							<Text style={[styles.loadingText, { color: colors.textMuted }]}>
-								{isLoggedIn ? '加载中...' : '登录网易云后查看推荐'}
-							</Text>
-						</View>
-					)}
-				</View>
-				)}
-
 				{/* 关注歌手 */}
 				{(isLoggedIn || qqLoggedIn) && (
 					<View style={styles.dailySection}>

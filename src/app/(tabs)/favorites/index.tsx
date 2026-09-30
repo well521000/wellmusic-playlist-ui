@@ -138,6 +138,11 @@ const FavoritesScreen = () => {
 	const [similarSong, setSimilarSong] = useState<any>(null)
 	const [visibleCount, setVisibleCount] = useState(7)
 	const [playlistVisibleCount, setPlaylistVisibleCount] = useState(6)
+	const [isSortingPlaylists, setIsSortingPlaylists] = useState(false)
+	const [playlistOrder, setPlaylistOrder] = useState<string[]>(() => {
+		const saved = PersistStatus.get('playlistOrder')
+		return Array.isArray(saved) ? saved : []
+	})
 	const { bottom: safeBottom, top: safeTop } = useSafeAreaInsets()
 	const favScrollRef = useRef<any>(null)
 	const { onScroll: onFavScroll, scrollToTop: favScrollToTop, progress: favFabProgress, shown: favFabShown } = useScrollToTop(favScrollRef, 320, -safeTop)
@@ -175,16 +180,51 @@ const FavoritesScreen = () => {
 		setHistoryCount(history?.length || 0)
 	}, [])
 
-	// 过滤出用户创建的歌单（排除系统歌单、推荐歌单、排行榜）
+	// 过滤出用户创建的歌单（排除系统歌单、推荐歌单、排行榜），并按自定义顺序排序
 	const userPlaylists = useMemo(() => {
-		return (storedPlayLists ?? []).filter((p: any) =>
+		const filtered = (storedPlayLists ?? []).filter((p: any) =>
 			p.id && !['favorites', 'local', 'history'].includes(p.id) && !p.isRecommendPlaylist && !p.isToplist
 		)
-	}, [storedPlayLists])
+		if (playlistOrder.length > 0) {
+			const orderMap = new Map(playlistOrder.map((id, idx) => [id, idx]))
+			return [...filtered].sort((a: any, b: any) => {
+				const idxA = orderMap.has(a.id) ? orderMap.get(a.id)! : Number.MAX_SAFE_INTEGER
+				const idxB = orderMap.has(b.id) ? orderMap.get(b.id)! : Number.MAX_SAFE_INTEGER
+				return idxA - idxB
+			})
+		}
+		return filtered
+	}, [storedPlayLists, playlistOrder])
 
 	// 歌单点击
 	const handlePlaylistPress = (playlist: any) => {
+		if (isSortingPlaylists) return
 		router.push(`/(tabs)/favorites/${playlist.id}`)
+	}
+
+	// 进入/退出排序模式
+	const toggleSortMode = () => {
+		if (isSortingPlaylists) {
+			// 保存排序
+			const order = userPlaylists.map((p: any) => p.id)
+			setPlaylistOrder(order)
+			PersistStatus.set('playlistOrder', order)
+			showToast('排序已保存', '', 'success')
+		} else {
+			// 进入排序模式时初始化顺序
+			setPlaylistOrder(userPlaylists.map((p: any) => p.id))
+		}
+		setIsSortingPlaylists(!isSortingPlaylists)
+	}
+
+	// 移动歌单位置
+	const movePlaylist = (index: number, direction: 'up' | 'down') => {
+		const newIndex = direction === 'up' ? index - 1 : index + 1
+		if (newIndex < 0 || newIndex >= userPlaylists.length) return
+		const newOrder = [...userPlaylists]
+		const [moved] = newOrder.splice(index, 1)
+		newOrder.splice(newIndex, 0, moved)
+		setPlaylistOrder(newOrder.map((p: any) => p.id))
 	}
 
 	// 收藏歌曲点击播放（最新收藏的排第一，用reverse后的索引）
@@ -304,34 +344,75 @@ const FavoritesScreen = () => {
 					<Text style={[styles.sectionTitle, { color: colors.text }]}>
 						我的歌单 ({userPlaylists.length})
 					</Text>
-					<TouchableOpacity onPress={() => setShowAddModal(true)}>
-						<SFSymbol systemName="tray.and.arrow.down" size={26} color={colors.text} />
-					</TouchableOpacity>
-					<TouchableOpacity onPress={() => Alert.alert('查看更多', '开发中')} style={{ marginLeft: 16 }}>
-						<Text style={[styles.seeMore, { color: colors.primary }]}>查看更多</Text>
+					{!isSortingPlaylists && (
+						<TouchableOpacity onPress={() => setShowAddModal(true)}>
+							<SFSymbol systemName="tray.and.arrow.down" size={26} color={colors.text} />
+						</TouchableOpacity>
+					)}
+					<TouchableOpacity onPress={toggleSortMode} style={{ marginLeft: 16 }}>
+						<Text style={[styles.seeMore, { color: isSortingPlaylists ? '#ff453a' : colors.primary }]}>
+							{isSortingPlaylists ? '完成' : '自定义排序'}
+						</Text>
 					</TouchableOpacity>
 				</View>
 
-				{/* 歌单横向滚动（懒加载） */}
-				<ScrollView
-					horizontal
-					showsHorizontalScrollIndicator={false}
-					contentContainerStyle={styles.playlistsScroll}
-					onScroll={handlePlaylistScroll}
-					scrollEventThrottle={200}
-				>
-					{userPlaylists.length > 0 ? (
-						userPlaylists.slice(0, playlistVisibleCount).map((playlist: any, index: number) => (
-							<View key={playlist.id || index} style={styles.playlistCardWrapper}>
-								{renderPlaylistCard({ item: playlist })}
+				{/* 歌单区域：排序模式垂直列表，普通模式横向滚动 */}
+				{isSortingPlaylists ? (
+					<View style={styles.sortList}>
+						{userPlaylists.map((playlist: any, index: number) => (
+							<View key={playlist.id || index} style={styles.sortRow}>
+								<FastImage
+									source={{ uri: playlist.artwork || playlist.coverImg || unknownTrackImageUri, cache: shouldCacheImage() ? FastImage.cacheControl.immutable : FastImage.cacheControl.noCache }}
+									style={styles.sortCover}
+								/>
+								<View style={{ flex: 1, marginLeft: 12 }}>
+									<Text style={[styles.sortName, { color: colors.text }]} numberOfLines={1}>
+										{playlist.title || playlist.name || '歌单'}
+									</Text>
+									<Text style={[styles.sortDesc, { color: colors.textMuted }]} numberOfLines={1}>
+										{playlist.platform === 'netease' ? '网易云' : playlist.platform === 'qq' ? 'QQ音乐' : '歌单'} · {playlist.songs?.length || playlist.tracks?.length || 0}首
+									</Text>
+								</View>
+								<View style={styles.sortButtons}>
+									<TouchableOpacity
+										onPress={() => movePlaylist(index, 'up')}
+										disabled={index === 0}
+										style={[styles.sortBtn, index === 0 && { opacity: 0.3 }]}
+									>
+										<SFSymbol systemName="chevron.up" size={18} color={colors.text} />
+									</TouchableOpacity>
+									<TouchableOpacity
+										onPress={() => movePlaylist(index, 'down')}
+										disabled={index === userPlaylists.length - 1}
+										style={[styles.sortBtn, index === userPlaylists.length - 1 && { opacity: 0.3 }]}
+									>
+										<SFSymbol systemName="chevron.down" size={18} color={colors.text} />
+									</TouchableOpacity>
+								</View>
 							</View>
-						))
-					) : (
-						<View style={styles.emptyPlaylists}>
+						))}
+					</View>
+				) : (
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						contentContainerStyle={styles.playlistsScroll}
+						onScroll={handlePlaylistScroll}
+						scrollEventThrottle={200}
+					>
+						{userPlaylists.length > 0 ? (
+							userPlaylists.slice(0, playlistVisibleCount).map((playlist: any, index: number) => (
+								<View key={playlist.id || index} style={styles.playlistCardWrapper}>
+									{renderPlaylistCard({ item: playlist })}
+								</View>
+							))
+						) : (
+							<View style={styles.emptyPlaylists}>
 							<Text style={[styles.emptyText, { color: colors.textMuted }]}>暂无歌单</Text>
 						</View>
 					)}
 				</ScrollView>
+				)}
 
 				{/* 收藏歌曲 */}
 				<View style={styles.sectionHeader}>
@@ -472,6 +553,40 @@ const styles = StyleSheet.create({
 	playlistDesc: {
 		fontSize: 14,
 		marginTop: 2,
+	},
+	sortList: {
+		paddingHorizontal: 16,
+	},
+	sortRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 10,
+		borderBottomWidth: 0.5,
+		borderBottomColor: 'rgba(255,255,255,0.1)',
+	},
+	sortCover: {
+		width: 48,
+		height: 48,
+		borderRadius: 6,
+	},
+	sortName: {
+		fontSize: 15,
+		fontWeight: '500',
+	},
+	sortDesc: {
+		fontSize: 12,
+		marginTop: 3,
+	},
+	sortButtons: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
+	sortBtn: {
+		width: 36,
+		height: 36,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	emptyPlaylists: {
 		width: 160,
