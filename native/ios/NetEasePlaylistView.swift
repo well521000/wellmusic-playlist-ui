@@ -159,8 +159,6 @@ struct BackgroundBlurLayer: View {
                     default:
                         Color(red: 0.15, green: 0.1, blue: 0.12)
                             .frame(width: geo.size.width, height: geo.size.width * 0.9)
-                    @unknown default:
-                        EmptyView()
                     }
                 }
 
@@ -206,8 +204,6 @@ struct PlaylistHeaderSection: View {
                         image.resizable().aspectRatio(contentMode: .fill)
                     default:
                         Color.gray.opacity(0.4)
-                    @unknown default:
-                        EmptyView()
                     }
                 }
                 .frame(width: coverSize, height: coverSize)
@@ -240,8 +236,6 @@ struct PlaylistHeaderSection: View {
                                 image.resizable().aspectRatio(contentMode: .fill)
                             default:
                                 Color.gray.opacity(0.4)
-                            @unknown default:
-                                EmptyView()
                             }
                         }
                         .frame(width: 24, height: 24).clipShape(Circle())
@@ -546,8 +540,6 @@ struct MiniPlayerLayer: View {
                         image.resizable().aspectRatio(contentMode: .fill)
                     default:
                         Color.gray.opacity(0.4)
-                    @unknown default:
-                        EmptyView()
                     }
                 }
                 .frame(width: 40, height: 40).cornerRadius(5)
